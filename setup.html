@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>push setup</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  body { font:15px/1.5 ui-monospace, Menlo, monospace; background:#111; color:#eee; max-width:720px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:18px; font-weight:500; } h2 { font-size:15px; margin-top:36px; color:#aaa; font-weight:500; }
+  textarea, input { width:100%; background:#1b1b1b; color:#eee; border:1px solid #333; border-radius:6px; padding:10px; font:inherit; font-size:12px; }
+  textarea { height:80px; } label { display:block; margin:14px 0 4px; color:#aaa; font-size:13px; }
+  button { background:#eee; color:#111; border:0; border-radius:6px; padding:10px 16px; font:inherit; cursor:pointer; margin-top:10px; }
+  .qr { background:#fff; padding:14px; display:inline-block; margin-top:14px; border-radius:6px; }
+  p.note { color:#888; font-size:13px; }
+</style>
+</head>
+<body>
+<h1>in-between push · setup</h1>
+<p class="note">Keys are made inside this browser. Nothing is sent anywhere.</p>
+
+<h2>1 · Make keys (do this once)</h2>
+<button id="gen">Generate</button>
+<label>Public key → paste into config.js as VAPID_PUBLIC_KEY</label>
+<textarea id="pub" readonly></textarea>
+<label>Private key → Supabase secret named VAPID_PRIVATE_JWK</label>
+<textarea id="priv" readonly></textarea>
+<label>Send secret → Supabase secret named SEND_SECRET (also type it into watch.html once)</label>
+<input id="sec" readonly>
+<p class="note">Copy all three somewhere safe now. If you generate again, everyone subscribed so far has to scan again.</p>
+
+<h2>2 · QR code for an alley</h2>
+<label>Location name (must match what you pick on the camera phone)</label>
+<input id="loc" value="alley-1">
+<button id="mk">Make QR</button>
+<p id="link" class="note"></p>
+<div class="qr" id="qr"></div>
+
+<script>
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+document.getElementById("gen").onclick = async () => {
+  const kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const jwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const raw = await crypto.subtle.exportKey("raw", kp.publicKey);
+  document.getElementById("pub").value = b64u(raw);
+  document.getElementById("priv").value = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
+  document.getElementById("sec").value = b64u(crypto.getRandomValues(new Uint8Array(12)));
+};
+document.getElementById("mk").onclick = () => {
+  const loc = document.getElementById("loc").value.trim() || "alley-1";
+  const url = new URL("./?at=" + encodeURIComponent(loc), location.href).href;
+  document.getElementById("link").textContent = url;
+  const el = document.getElementById("qr"); el.innerHTML = "";
+  new QRCode(el, { text: url, width: 260, height: 260 });
+};
+</script>
+</body>
+</html>
